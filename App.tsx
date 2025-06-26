@@ -1,6 +1,6 @@
 import './style.css';
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Upload, ZoomIn, ZoomOut, RotateCcw, MapPin } from 'lucide-react';
 
 export default function App() {
   return <PolygonVisualizer />;
@@ -10,6 +10,9 @@ const PolygonVisualizer = () => {
   const [polygons, setPolygons] = useState([]);
   const [inputText, setInputText] = useState('');
   const [error, setError] = useState('');
+  const [xCoordinate, setXCoordinate] = useState('');
+  const [zCoordinate, setZCoordinate] = useState('');
+  const [customPoint, setCustomPoint] = useState(null);
   const [viewBox, setViewBox] = useState({
     minX: 0,
     minY: 0,
@@ -55,14 +58,15 @@ const PolygonVisualizer = () => {
   ]
 ]`;
 
-  const calculateBounds = (polygons) => {
-    if (!polygons.length) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+  const calculateBounds = (polygons, customPoint = null) => {
+    if (!polygons.length && !customPoint) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
 
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
       maxY = -Infinity;
 
+    // Include polygon points
     polygons.forEach((polygon) => {
       polygon.forEach((point) => {
         minX = Math.min(minX, point.x);
@@ -71,6 +75,22 @@ const PolygonVisualizer = () => {
         maxY = Math.max(maxY, -point.z);
       });
     });
+
+    // Include custom point if it exists
+    if (customPoint) {
+      minX = Math.min(minX, customPoint.x);
+      maxX = Math.max(maxX, customPoint.x);
+      minY = Math.min(minY, -customPoint.z);
+      maxY = Math.max(maxY, -customPoint.z);
+    }
+
+    // Handle case where we only have a single point
+    if (minX === maxX && minY === maxY) {
+      minX -= 5;
+      maxX += 5;
+      minY -= 5;
+      maxY += 5;
+    }
 
     // Add padding
     const padding = Math.max(maxX - minX, maxY - minY) * 0.1;
@@ -82,8 +102,8 @@ const PolygonVisualizer = () => {
     return { minX, minY, maxX, maxY };
   };
 
-  const updateViewBox = (polygons) => {
-    const bounds = calculateBounds(polygons);
+  const updateViewBox = (polygons, customPoint = null) => {
+    const bounds = calculateBounds(polygons, customPoint);
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
     setViewBox({
@@ -132,17 +152,37 @@ const PolygonVisualizer = () => {
 
     if (!text.trim()) {
       setPolygons([]);
+      updateViewBox([], customPoint);
       return;
     }
 
     try {
       const parsed = parsePolygons(text);
       setPolygons(parsed);
-      updateViewBox(parsed);
+      updateViewBox(parsed, customPoint);
     } catch (err) {
       setError(err.message);
       setPolygons([]);
     }
+  };
+
+  const handleCoordinateChange = (x, z) => {
+    setXCoordinate(x);
+    setZCoordinate(z);
+
+    // Parse and validate coordinates
+    const xNum = parseFloat(x);
+    const zNum = parseFloat(z);
+
+    if (x.trim() === '' || z.trim() === '' || isNaN(xNum) || isNaN(zNum)) {
+      setCustomPoint(null);
+      updateViewBox(polygons, null);
+      return;
+    }
+
+    const newPoint = { x: xNum, z: zNum };
+    setCustomPoint(newPoint);
+    updateViewBox(polygons, newPoint);
   };
 
   const generatePolygonPath = (polygon) => {
@@ -170,9 +210,7 @@ const PolygonVisualizer = () => {
 
   const handleReset = () => {
     setZoom(1);
-    if (polygons.length > 0) {
-      updateViewBox(polygons);
-    }
+    updateViewBox(polygons, customPoint);
   };
 
   const loadSampleData = () => {
@@ -225,6 +263,51 @@ const PolygonVisualizer = () => {
             placeholder="Paste your polygon data here..."
             className="w-full h-64 p-3 border border-gray-300 rounded-lg font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+
+          {/* Custom Point Input */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <MapPin size={16} className="text-red-600" />
+              <h3 className="font-semibold text-gray-900">Custom Point</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="x-coordinate" className="block text-sm font-medium text-gray-700 mb-1">
+                  X Coordinate
+                </label>
+                <input
+                  id="x-coordinate"
+                  type="number"
+                  step="any"
+                  value={xCoordinate}
+                  onChange={(e) => handleCoordinateChange(e.target.value, zCoordinate)}
+                  placeholder="Enter X value"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="z-coordinate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Z Coordinate
+                </label>
+                <input
+                  id="z-coordinate"
+                  type="number"
+                  step="any"
+                  value={zCoordinate}
+                  onChange={(e) => handleCoordinateChange(xCoordinate, e.target.value)}
+                  placeholder="Enter Z value"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+            {customPoint && (
+              <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">
+                  Custom point: ({customPoint.x}, {customPoint.z})
+                </p>
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -329,13 +412,38 @@ const PolygonVisualizer = () => {
                   ))}
                 </g>
               ))}
+
+              {/* Custom Point */}
+              {customPoint && (
+                <g>
+                  <circle
+                    cx={customPoint.x}
+                    cy={-customPoint.z}
+                    r="0.8"
+                    fill="#DC2626"
+                    stroke="#FFFFFF"
+                    strokeWidth="0.2"
+                    className="hover:r-4 transition-all cursor-pointer"
+                  />
+                  <circle
+                    cx={customPoint.x}
+                    cy={-customPoint.z}
+                    r="1.5"
+                    fill="none"
+                    stroke="#DC2626"
+                    strokeWidth="0.1"
+                    strokeDasharray="0.3,0.3"
+                    opacity="0.7"
+                  />
+                </g>
+              )}
             </svg>
           </div>
 
-          {polygons.length === 0 && (
+          {polygons.length === 0 && !customPoint && (
             <div className="flex items-center justify-center h-96 border-2 border-dashed border-gray-300 rounded-lg">
               <p className="text-gray-500">
-                No polygons to display. Add data to visualize.
+                No polygons or points to display. Add data to visualize.
               </p>
             </div>
           )}
@@ -343,7 +451,7 @@ const PolygonVisualizer = () => {
       </div>
 
       {/* Legend */}
-      {polygons.length > 0 && (
+      {(polygons.length > 0 || customPoint) && (
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="font-semibold mb-3">Legend</h3>
           <div className="flex flex-wrap gap-4">
@@ -358,6 +466,14 @@ const PolygonVisualizer = () => {
                 </span>
               </div>
             ))}
+            {customPoint && (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-600"></div>
+                <span className="text-sm">
+                  Custom Point ({customPoint.x}, {customPoint.z})
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
