@@ -20,6 +20,17 @@ const PolygonVisualizer = () => {
     height: 100,
   });
   const [zoom, setZoom] = useState(1);
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    content: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    content: ''
+  });
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Sample data for demonstration
@@ -221,6 +232,26 @@ const PolygonVisualizer = () => {
     return colors[index % colors.length];
   };
 
+  const handlePointHover = (event: React.MouseEvent, point: {x: number, z: number}, polygonIndex?: number) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const content = polygonIndex !== undefined 
+      ? `Polygon ${polygonIndex + 1}\nX: ${point.x.toFixed(3)}\nZ: ${point.z.toFixed(3)}`
+      : `Custom Point\nX: ${point.x.toFixed(3)}\nZ: ${point.z.toFixed(3)}`;
+
+    setTooltip({
+      visible: true,
+      x: event.clientX - rect.left + 10,
+      y: event.clientY - rect.top - 10,
+      content
+    });
+  };
+
+  const handlePointLeave = () => {
+    setTooltip(prev => ({ ...prev, visible: false }));
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -343,7 +374,7 @@ const PolygonVisualizer = () => {
             </div>
           </div>
 
-          <div className="border border-gray-300 rounded-lg bg-white overflow-hidden">
+          <div className="border border-gray-300 rounded-lg bg-white overflow-hidden relative">
             <svg
               ref={svgRef}
               width="100%"
@@ -396,7 +427,9 @@ const PolygonVisualizer = () => {
                       cy={-point.z}
                       r="0.3"
                       fill={getPolygonColor(index)}
-                      className="hover:r-3 transition-all"
+                      className="hover:r-3 transition-all cursor-pointer"
+                      onMouseEnter={(e) => handlePointHover(e, point, index)}
+                      onMouseLeave={handlePointLeave}
                     />
                   ))}
                 </g>
@@ -413,6 +446,8 @@ const PolygonVisualizer = () => {
                     stroke="#FFFFFF"
                     strokeWidth="0.2"
                     className="hover:r-4 transition-all cursor-pointer"
+                    onMouseEnter={(e) => handlePointHover(e, customPoint)}
+                    onMouseLeave={handlePointLeave}
                   />
                   <circle
                     cx={customPoint.x}
@@ -427,6 +462,20 @@ const PolygonVisualizer = () => {
                 </g>
               )}
             </svg>
+
+            {/* Tooltip */}
+            {tooltip.visible && (
+              <div
+                className="absolute pointer-events-none z-10 bg-gray-900 text-white text-xs rounded-md px-2 py-1 shadow-lg whitespace-pre-line"
+                style={{
+                  left: tooltip.x,
+                  top: tooltip.y,
+                  transform: 'translate(0, -100%)'
+                }}
+              >
+                {tooltip.content}
+              </div>
+            )}
           </div>
 
           {polygons.length === 0 && !customPoint && (
