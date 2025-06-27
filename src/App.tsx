@@ -80,13 +80,13 @@ const PolygonVisualizer = () => {
       maxX = -Infinity,
       maxY = -Infinity;
 
-    // Include polygon points
+    // Include polygon points - now z maps directly to Y (no inversion)
     polygons.forEach((polygon) => {
       polygon.forEach((point) => {
         minX = Math.min(minX, point.x);
         maxX = Math.max(maxX, point.x);
-        minY = Math.min(minY, -point.z); // Flip Z to Y for display
-        maxY = Math.max(maxY, -point.z);
+        minY = Math.min(minY, point.z); // Direct mapping: z -> Y
+        maxY = Math.max(maxY, point.z);
       });
     });
 
@@ -94,8 +94,8 @@ const PolygonVisualizer = () => {
     if (customPoint) {
       minX = Math.min(minX, customPoint.x);
       maxX = Math.max(maxX, customPoint.x);
-      minY = Math.min(minY, -customPoint.z);
-      maxY = Math.max(maxY, -customPoint.z);
+      minY = Math.min(minY, customPoint.z); // Direct mapping: z -> Y
+      maxY = Math.max(maxY, customPoint.z);
     }
 
     // Handle case where we only have a single point
@@ -202,7 +202,7 @@ const PolygonVisualizer = () => {
   };
 
   const generatePolygonPoints = (polygon: Array<{x: number, z: number}>) => {
-    return polygon.map((point) => `${point.x},${-point.z}`).join(' ');
+    return polygon.map((point) => `${point.x},${point.z}`).join(' '); // Direct mapping: z -> Y
   };
 
   const handleZoomIn = () => {
@@ -489,7 +489,7 @@ const PolygonVisualizer = () => {
                     <circle
                       key={pointIndex}
                       cx={point.x}
-                      cy={-point.z}
+                      cy={point.z}
                       r="1.5"
                       fill={getPolygonColor(index)}
                       className="hover:r-3 transition-all cursor-pointer"
@@ -505,7 +505,7 @@ const PolygonVisualizer = () => {
                 <g>
                   <circle
                     cx={customPoint.x}
-                    cy={-customPoint.z}
+                    cy={customPoint.z}
                     r="0.8"
                     fill="#DC2626"
                     stroke="#FFFFFF"
@@ -516,7 +516,7 @@ const PolygonVisualizer = () => {
                   />
                   <circle
                     cx={customPoint.x}
-                    cy={-customPoint.z}
+                    cy={customPoint.z}
                     r="1.5"
                     fill="none"
                     stroke="#DC2626"
