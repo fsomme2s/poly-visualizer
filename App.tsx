@@ -405,7 +405,7 @@ const PolygonVisualizer = () => {
                       key={pointIndex}
                       cx={point.x}
                       cy={-point.z}
-                      r="0.3"
+                      r="1.5"
                       fill={getPolygonColor(index)}
                       className="hover:r-3 transition-all"
                     />
