@@ -31,6 +31,9 @@ const PolygonVisualizer = () => {
     y: 0,
     content: ''
   });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
+  const [panOffset, setPanOffset] = useState({x: 0, y: 0});
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Sample data for demonstration
@@ -123,6 +126,8 @@ const PolygonVisualizer = () => {
       width: width,
       height: height,
     });
+    // Reset pan offset when updating view box
+    setPanOffset({x: 0, y: 0});
   };
 
   const parsePolygons = (text: string) => {
@@ -210,6 +215,7 @@ const PolygonVisualizer = () => {
 
   const handleReset = () => {
     setZoom(1);
+    setPanOffset({x: 0, y: 0});
     updateViewBox(polygons, customPoint);
   };
 
@@ -233,6 +239,8 @@ const PolygonVisualizer = () => {
   };
 
   const handlePointHover = (event: React.MouseEvent, point: {x: number, z: number}, polygonIndex?: number) => {
+    if (isDragging) return; // Don't show tooltip while dragging
+    
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -250,6 +258,61 @@ const PolygonVisualizer = () => {
 
   const handlePointLeave = () => {
     setTooltip(prev => ({ ...prev, visible: false }));
+  };
+
+  // Mouse drag handlers
+  const handleMouseDown = (event: React.MouseEvent) => {
+    if (event.button !== 0) return; // Only handle left mouse button
+    
+    setIsDragging(true);
+    setDragStart({
+      x: event.clientX,
+      y: event.clientY
+    });
+    setTooltip(prev => ({ ...prev, visible: false })); // Hide tooltip when starting drag
+    event.preventDefault();
+  };
+
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (!isDragging || !dragStart || !svgRef.current) return;
+
+    const rect = svgRef.current.getBoundingClientRect();
+    const deltaX = event.clientX - dragStart.x;
+    const deltaY = event.clientY - dragStart.y;
+    
+    // Convert pixel movement to SVG coordinate movement
+    const scaleX = (viewBox.width / zoom) / rect.width;
+    const scaleY = (viewBox.height / zoom) / rect.height;
+    
+    const newPanOffset = {
+      x: panOffset.x - deltaX * scaleX,
+      y: panOffset.y - deltaY * scaleY
+    };
+    
+    setPanOffset(newPanOffset);
+    setDragStart({
+      x: event.clientX,
+      y: event.clientY
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+    setDragStart(null);
+    setTooltip(prev => ({ ...prev, visible: false }));
+  };
+
+  // Calculate the current viewBox with pan offset
+  const currentViewBox = {
+    minX: viewBox.minX + panOffset.x,
+    minY: viewBox.minY + panOffset.y,
+    width: viewBox.width / zoom,
+    height: viewBox.height / zoom
   };
 
   return (
@@ -379,16 +442,18 @@ const PolygonVisualizer = () => {
               ref={svgRef}
               width="100%"
               height="400"
-              viewBox={`${viewBox.minX} ${viewBox.minY} ${
-                viewBox.width / zoom
-              } ${viewBox.height / zoom}`}
-              className="block"
+              viewBox={`${currentViewBox.minX} ${currentViewBox.minY} ${currentViewBox.width} ${currentViewBox.height}`}
+              className={`block ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
               style={{
                 background:
                   'linear-gradient(45deg, #f8f9fa 25%, transparent 25%), linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f8f9fa 75%), linear-gradient(-45deg, transparent 75%, #f8f9fa 75%)',
                 backgroundSize: '20px 20px',
                 backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
               }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
             >
               {/* Grid lines */}
               <defs>
@@ -425,7 +490,7 @@ const PolygonVisualizer = () => {
                       key={pointIndex}
                       cx={point.x}
                       cy={-point.z}
-                      r="0.3"
+                      r="1.5"
                       fill={getPolygonColor(index)}
                       className="hover:r-3 transition-all cursor-pointer"
                       onMouseEnter={(e) => handlePointHover(e, point, index)}
@@ -464,7 +529,7 @@ const PolygonVisualizer = () => {
             </svg>
 
             {/* Tooltip */}
-            {tooltip.visible && (
+            {tooltip.visible && !isDragging && (
               <div
                 className="absolute pointer-events-none z-10 bg-gray-900 text-white text-xs rounded-md px-2 py-1 shadow-lg whitespace-pre-line"
                 style={{
